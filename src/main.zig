@@ -17,7 +17,7 @@ const GermanString = packed struct {
     }
 
     pub inline fn get(self: *GermanString) []const u8 {
-        return if (self.len > 12) self.content.long.ptr[4 .. self.len + 4] else {
+        return if (self.len > 12) self.content.long.ptr[4..self.len] else {
             const as_arr: *[16]u8 = @ptrCast(&self.content.short);
             return as_arr[4 .. self.len + 4];
         };
@@ -41,7 +41,7 @@ const GerString = struct {
     pub fn deinit(self: *GerString) void {
         if (self.string.len > 12) {
             var string: []u8 = undefined;
-            string.len = @intCast(self.string.len);
+            string.len = @intCast(self.string.len - 4);
             string.ptr = self.string.content.long.ptr;
             self.alloc.free(string);
             self.string.len = 0;
@@ -52,13 +52,13 @@ const GerString = struct {
 
     fn create(self: *GerString, str: []const u8) !void {
         if (str.len > 12) {
-            self.string.len = @intCast(str.len - 4);
+            self.string.len = @intCast(str.len);
             self.string.content = .{ .long = .{
                 .prefix = undefined,
-                .ptr = (try self.alloc.alloc(u8, self.string.len)).ptr,
+                .ptr = (try self.alloc.alloc(u8, self.string.len - 4)).ptr,
             } };
             self.string.content.long.prefix = std.mem.bytesToValue(u32, str[0..4]);
-            @memcpy(self.string.content.long.ptr[4 .. self.string.len + 4], str[4..]);
+            @memcpy(self.string.content.long.ptr[4..self.string.len], str[4..]);
         } else {
             self.string.len = @intCast(str.len);
             self.string.content.short = @splat(0);
@@ -96,4 +96,11 @@ pub fn main() !void {
 
 test {
     std.testing.refAllDecls(@This());
+}
+
+test "test length" {
+    const allocator = std.testing.allocator;
+
+    var ger_str = try GerString.init(allocator, "0123456789123"); // 13 bytes
+    defer ger_str.deinit();
 }
